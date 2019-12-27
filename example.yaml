@@ -81,6 +81,9 @@ spec:
           - name: parsed-images
             valueFrom:
               path: /parse-images.txt
+          - name: parsed-repos
+            valueFrom:
+              path: /parse-repoes.txt
 
     - name: make_value_file
       inputs:
@@ -118,6 +121,12 @@ spec:
           cd /
           git clone https://github.com/rbxorkt12/argogyu.git
           mv /IMAGEVERSION /argogyu
-          cd argogyu && git add . && git commit -m 'IMAGEVERSION change'
-          git push --force
+          cd argogyu
+          if [ "git status | grep nothing" ]; then
+                echo 'No image version change'
+          fi
+          else
+                git add . && git commit -m 'IMAGEVERSION change'
+                git push --force
+          fi
         "]
