@@ -38,20 +38,20 @@ func removeDuplicates(elements []string) []string {
 
 func main(){
 	appoconfig := &Appoconfig{}
-	viper.SetConfigName("Apposync")
-	viper.AddConfigPath("/tmp")
+	viper.SetConfigName("Appoconfig")
+	viper.AddConfigPath("/tmp/argogyu")
 	if err := viper.ReadInConfig(); err != nil {
 		fmt.Errorf("Can't read config file: %s \n", err)
 	}
 	if err := viper.Unmarshal(appoconfig); err != nil {
 		fmt.Errorf("config file format error: %s \n", err)
 	}
-	fo1, err := os.Create("./parse_images.txt")
+	fo1, err := os.Create("/tmp/parse_images.txt")
 	if err != nil {
 		panic(err)
 	}
 	defer fo1.Close()
-	fo2, err := os.Create("./parse_repoes.txt")
+	fo2, err := os.Create("/tmp/parse_repoes.txt")
 	if err != nil {
 		panic(err)
 	}

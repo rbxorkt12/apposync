@@ -24,12 +24,12 @@ func main() {
 	// Request 객체 생성
 	// go function을 통환 프로세스 격리화
 	// local file에 있는 값들을 불러와서 for 문을 통한 calling and parsing
-	fi, err := os.Open("./parse_images.txt")
+	fi, err := os.Open("/tmp/parse_images.txt")
 	if err != nil {
 		panic(err)
 	}
 	defer fi.Close()
-	fo, err := os.Create("./Appoimages")
+	fo, err := os.Create("/tmp/IMAGEVERSIONS")
 	if err != nil {
 		panic(err)
 	}

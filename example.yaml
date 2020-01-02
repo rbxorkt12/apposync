@@ -2,10 +2,10 @@ apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
   generateName: example-argogyu-
-
 spec:
   entrypoint: app-match
-
+  podGC:
+    strategy: OnWorkflowSuccess
   volumeClaimTemplates:
     - metadata:
         name: temp-git
@@ -14,7 +14,7 @@ spec:
         accessModes: [ "ReadWriteOnce" ]
         resources:
           requests:
-            storage: 1Gi
+            storage: 100Mi
   templates:
     - name: app-match
       steps:
@@ -23,30 +23,27 @@ spec:
         - - name: copy2
             template: copy-git-go
         - - name: parse
-            template: parse_image
+            template: parse-image
         - - name: makevaluefile
-            template: make_value_file
-            arguments:
-              artifacts:
-                - name: imagevalue
-                  from: "{{steps.parse.outputs.artifacts.parsed-images}}"
+            template: make-value-file
         - - name: gitchange
-            tempalte: git_change
-            arguments:
-              artifacts:
-                - name: changed-version
-                  from: "{{steps.makevaluefile.outputs.artifacts.versionfile}}"
-
+            template: git-change
 
     - name: copy-git-workflow
       inputs:
         artifacts:
-          - name: temporary-git
-            path: /tmp
-            git:
-              repo: https://github.com/rbxorkt12/argogyu.git
+        - name: temporary-git
+          path: /github/argogyu
+          git:
+            repo: https://github.com/rbxorkt12/argogyu.git
       container:
         image: alpine:3.8
+        command: [sh, -c]
+        args: ["
+          ls -al /github/argogyu;
+          cp -r /github/argogyu /tmp;
+          ls -al /tmp;
+        "]
         volumeMounts:
         - name: temp-git
           mountPath: /tmp
@@ -54,79 +51,80 @@ spec:
     - name: copy-git-go
       inputs:
         artifacts:
-          - name: temporary-git
-            path: /go
-            git:
-              repo: https://github.com/rbxorkt12/argosync.git
+        - name: go-git
+          path: /github/apposync
+          git:
+            repo: https://github.com/rbxorkt12/apposync.git
       container:
-        image: alpine:3.8
+        image: ubuntu
+        command: [sh, -c]
+        args: ["
+          ls -al /github/apposync;
+          cp -r /github/apposync /go;
+          ls -al /go;
+        "]
         volumeMounts:
-          - name: temp-git
-            mountPath: /go
+        - name: temp-git
+          mountPath: /go
 
-    - name: parse_image
+    - name: parse-image
+      container:
+        image: ubuntu
+        command: [sh, -c]
+        args: ["
+          ls -al /tmp/argogyu;
+          /go/apposync/parse/parse;
+          cat /tmp/parse_images.txt;
+          cat /tmp/parse_repoes.txt;
+        "]
+        volumeMounts:
+        - name: temp-git
+          mountPath: /tmp
+        - name: temp-git
+          mountPath: /go
+
+    - name: make-value-file
       container:
         image: golang:1.8
         volumeMounts:
-          - name: temp-git
-            mountPath: /go
+        - name: temp-git
+          mountPath: /tmp
+        - name: temp-git
+          mountPath: /go
         command: [sh, -c]
         args: ["
-          cd /go/apposync/parse&&
-          go mod vendor&&
-          go run parse.go
+          ls -al /go/apposync/makenewimage;
+          /go/apposync/makenewimage/make;
+          echo 'imageversion value';
+          cat /tmp/IMAGEVERSIONS
         "]
-      outputs:
-        artifacts:
-          - name: parsed-images
-            valueFrom:
-              path: /parse-images.txt
-          - name: parsed-repos
-            valueFrom:
-              path: /parse-repoes.txt
 
-    - name: make_value_file
+    - name: git-change
       inputs:
         artifacts:
-          - name: imagevalue
-            path: /parse-images.txt
-      container:
-        image: golang:1.8
-        volumeMounts:
-          - name: temp-git
-            mountPath: /tmp
-          - name: temp-git
-            mountPath: /go
-        command: [sh, -c]
-        args: ["
-          cd /go/apposync/makenewimage
-          go mod vendor&&
-          go run make.go
-        "]
-      outputs:
-        artifacts:
-          - name: versionfile
-            valueFrom:
-              path: /IMAGEVERSION
-
-    - name: git_change
-      inputs:
-        artifacts:
-          - name: changed-version
-            path: /IMAGEVERSION
-      container:
-        image: alpine/git
-        command: [sh, -c]
-        args: ["
+        - name: go-git
+          path: /argogyu
+          git:
+            repo: https://github.com/rbxorkt12/argogyu.git
+            usernameSecret:
+              name: github-creds
+              key: username
+            passwordSecret:
+              name: github-creds
+              key: password
+      script:
+        image: ceregousa/ubuntu-git
+        volumeMounts: 
+        - name: temp-git
+          mountPath: /tmp
+        command: [bash]
+        source: |
           cd /
-          git clone https://github.com/rbxorkt12/argogyu.git
-          mv /IMAGEVERSION /argogyu
-          cd argogyu
+          cp -r /tmp/IMAGEVERSIONS /argogyu
+          cd /argogyu
           if [ "git status | grep nothing" ]; then
                 echo 'No image version change'
-          fi
           else
-                git add . && git commit -m 'IMAGEVERSION change'
+                git add IMAGEVERSION && git commit -m 'IMAGEVERSION change'
                 git push --force
           fi
-        "]
